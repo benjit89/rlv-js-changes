@@ -7,6 +7,17 @@ var refineparamsAry = [];
 var url = window.location.href;
 window.searchJscroll = null;
 
+var searchEnforcement;
+
+function setupEnforcement(myEnforcement){
+ myEnforcement.setConfig({
+   onReady: function() {
+     console.log("Ready to Enforce....");
+     searchEnforcement = myEnforcement;
+   },
+ });
+}
+
 var deviceType = checkDevice();
 var processSearchResultsError = function(sid, errorCode, errorMsg) {
     $(".modal").modal('hide');
@@ -309,43 +320,24 @@ function clickSeletNow(event, htmlObj) {
 
     var rid = $(htmlObj).attr('rid');
     var priceDisplay = $("#tax-display-set").val();
-    var ajax_hotel_room_url = $("#search_hotel_room_ajax_url").val();
 
     $("#continue-message").modal('show');
     $("#continue-message .loader").show();
     $("#continue-message .error-modal").hide();
     $("#continue-message .error-content").empty();
-    //For error modal window
-    $("#custsup-session-id").val(sid);
-    $.get(ajax_hotel_room_url + "?sid=" + sid + "&hotel_id=" + hotel_id + "&sv_page=" + sv_page + "&ms=" + new Date().getTime(), {}, function(json_results) {
-        var results = JSON.parse(json_results);
-        if (results.status == 'ok') {
-            //$("#continue-message").modal('hide');
-            if (deviceType == 'mobile') {
-                $("#continue-message").modal('hide');
-            }
-            window.location = hotel_detail_url + '?sid=' + sid + '&hotel_id=' + hotel_id + "&sv_page=" + sv_page + '&rid=' + rid + '&pshow=' + priceDisplay;
-        } else if (results.errorCode) {
-            $("#continue-message .loader").hide();
-            $("#modal-error-code").val(results.errorCode);
-            processSearchResultsError(sid, results.errorCode, results.msg);
-        }
-    });
+    setTimeout(function() {
+       window.location = hotel_detail_url + '?sid=' + sid + '&hotel_id=' + hotel_id + "&sv_page=" + sv_page + '&rid=' + rid + '&pshow=' + priceDisplay;
+    },300);
     stopPropagation(event);
 }
 
 var ec = false; //create placeholder variable for challenge
 var sid, ajax_hotel_room_url, sv_page, hotel_id, button, curPlatform, more_package_block; //create global variables for ajax calls.
 
-//calback is triggered if a challenge is presented.
-function ecOnShown() {
-  console.log("Now trigger modal overlay - challenge is presented");
-  //Placeholder function - this is where you trigger the modal overlay with Arkose Enforcement.
-}
 
 //callback is fired when EC is solved, either automatically, or after a user completes it in-browser.
-function ecCallback() {
-    showMorePkgAjax(document.getElementById("FunCaptcha-Token").value);
+function ecCallback(response) {
+    showMorePkgAjax(response.token);
 }
 
 function showMorePkgAjax(token) {
@@ -440,119 +432,30 @@ function clickShowMorePkg(event, htmlObj) {
             hotel_id = $(htmlObj).attr("hotel_id");
             button = $(htmlObj);
 
-            //if EC is not created, create it, otherwise just refresh it.
-            if (!ec) {
-                ec = new ArkoseEnforcement({
-                    public_key: "3622F205-4413-1B7F-84B5-C05243771B78",
-                    target_html: "CAPTCHA",
-                    callback: ecCallback, //on completion
-                    onshown: ecOnShown //on challenge presented
-                });
-            } else {
-              //refreshing will trigger a new challenge and callback logic.
-                ec.refresh_session();
-            }
-        }
-    }
-    stopPropagation(event);
-}
-
-function clickShowMorePkg_old(event, htmlObj) {
-    //check 'hotel-options' status
-    //var resPerGroup = $(htmlObj).attr('resPerGroup');
-    var more_package_block = $(htmlObj).parentsUntil('.package-result', '.row-fluid').find('div.hotel-options');
-    if ($(htmlObj).hasClass('open')) {
-        $(more_package_block).fadeOut('slow');
-        //$(htmlObj).removeClass('open').html("Show "+resPerGroup+" packages and promotions for this hotel<i class='icon-caret-down'></i>");
-        $(htmlObj).removeClass('open').html("Other Durations / Room Types<i class='icon-caret-down'></i>");
-
-    } else {
-        if ($(more_package_block).html() != '') {
-            //if already has the contents, just do show/hide
-            $(more_package_block).fadeIn('slow');
-            //  $(htmlObj).addClass('open').html("Hide "+resPerGroup+" packages and promotions for this hotel<i class='icon-caret-up'></i>");;
-            $(htmlObj).addClass('open').html("Other Durations / Room Types<i class='icon-caret-up'></i>");
-            ;
-        } else {
-            //need call ajax
-            var curPlatform = checkPlatform();
-            if (curPlatform !== 'phone') {
-                $.blockUI({
-                    message: "",
-                    css: {
-                        height: '0px',
-                        width: '0px',
-                        'border': 'none'
-                    },
-                    overlayCSS: {
-                        backgroundColor: '#000',
-                        opacity: 0,
-                        cursor: 'wait'
-                    }
-                });
-            }
-            $(more_package_block).html($("#load-more-message").html());
-            show_more_options_timer = setTimeout(show_more_options_timer_process, ajax_time_period, more_package_block);
-            //   1min
-            var sid = $("#sid").val();
-            var ajax_hotel_room_url = $("#search_hotel_room_ajax_url").val();
-            var sv_page = $(htmlObj).attr("sv_page");
-            var hotel_id = $(htmlObj).attr("hotel_id");
-            var button = $(htmlObj);
-
-            show_more_options_ajax_call = $.get(ajax_hotel_room_url + "?more-package=true&sid=" + sid + "&sv_page=" + sv_page + "&hotel_id=" + hotel_id + "&ms=" + new Date().getTime(), {}, function(json_results) {
-                if (show_more_options_timer) {
-                    clearTimeout(show_more_options_timer);
-                    show_more_options_timer = null;
-                    var results = JSON.parse(json_results);
-                    if (results.status == 'ok') {
-                        $(more_package_block).html(results.msg).fadeIn("slow");
-                        $(".flight-details").popover({
-                            html: true,
-                            animation: true,
-                            delay: 300,
-                            trigger: 'hover'
-                        });
-
-                        $('.meal-type').popover({
-                            html: true,
-                            animation: true,
-                            delay: 300,
-                            trigger: 'hover'
-                        });
-
-                        $(".promo-seat-selection").popover({
-                            html: true,
-                            animation: true,
-                            delay: 300,
-                            trigger: 'hover'
-                        });
-                        set_tax_display(more_package_block);
-                    } else {
-                        $("#modal-error-code").val(results.errorCode);
-                        if (results.errorCode == 1 || results.errorCode == 5) {
-                            //session expired
-                            $("#session-expired").modal('show');
-                        } else {
-                            $(more_package_block).html("<ul class='unstyled options'><li class='error-message'><i class='icon-frown'></i>" + results.msg + "</li></ul>");
-                        }
-                    }
-                    //$(button).addClass("open").html("Hide "+resPerGroup+" packages and promotions for this hotel<i class='icon-caret-up'></i>");
-                    $(button).addClass("open").html("Other Durations / Room Types<i class='icon-caret-up'></i>");
-                    if (curPlatform !== 'phone') {
-                        $.unblockUI();
-                    }
-                }
+            searchEnforcement.setConfig({
+              onReady: function() {
+              },
+              onCompleted: function(response) {
+                  ecCallback(response);
+                },
             });
+
+            searchEnforcement.run();
+
         }
     }
+
     stopPropagation(event);
 }
 
-function clickLoadMorePage(event, htmlObj) {
-    var ajaxLoadMoreUrl = $(htmlObj).attr("ref") + "&ms=" + new Date().getTime();
-    var $loadObj = $(htmlObj).parent();
-    $(htmlObj).html("Loading More...");
+
+var loadMoreEc=false,morePageEleObj;
+
+function ecOnMorePageCallback(response){
+    var token = response.token;
+    var ajaxLoadMoreUrl = $(morePageEleObj).attr("ref") + "&ms=" + new Date().getTime()+"&token="+token;
+    var $loadObj = $(morePageEleObj).parent();
+    $(morePageEleObj).html("Loading More...");
     var curPlatform = checkPlatform();
     if (curPlatform !== 'phone') {
         $.blockUI({
@@ -656,6 +559,21 @@ function clickLoadMorePage(event, htmlObj) {
             $.unblockUI();
         }
     });
+}
+
+function clickLoadMorePage(event, htmlObj) {
+    morePageEleObj = htmlObj;
+
+    searchEnforcement.setConfig({
+      onReady: function() {
+      },
+      onCompleted: function(response) {
+          console.log("Config Changed")
+          ecOnMorePageCallback(response);
+        },
+    });
+
+    searchEnforcement.run();
 
     stopPropagation(event);
 }
